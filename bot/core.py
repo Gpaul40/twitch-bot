@@ -2,14 +2,18 @@
 Core bot class — wires together all modules.
 """
 
-import os
 import logging
 from twitchio.ext import commands
 
+from bot.config import cfg
+from bot.helix import HelixClient
 from bot.clipping.clipper import Clipper
+from bot.clipping.highlight import HighlightManager
 from bot.stats.tracker import StatsTracker
 from bot.alerts.discord import DiscordAlerter
 from bot.rewards.handler import RewardHandler
+from bot.events.handler import EventHandler
+from bot.stream_monitor import StreamMonitor
 from bot.commands import general, clips, stats as stats_cmds
 
 logging.basicConfig(
@@ -24,21 +28,36 @@ logger = logging.getLogger("bot.core")
 
 
 class TwitchBot(commands.Bot):
-    def __init__(self, token: str, client_id: str, client_secret: str, channel: str):
+    def __init__(self):
         super().__init__(
-            token=token,
-            client_id=client_id,
-            client_secret=client_secret,
+            token=cfg.oauth_token,
+            client_id=cfg.client_id,
+            client_secret=cfg.client_secret,
             prefix="!",
-            initial_channels=[channel],
+            initial_channels=[cfg.channel],
         )
-        self.channel_name = channel
-        self.broadcaster_id = os.getenv("TWITCH_BROADCASTER_ID", "")
+        self.cfg = cfg
 
-        self.clipper = Clipper(client_id=client_id, oauth_token=token)
-        self.stats = StatsTracker(db_path=os.getenv("STATS_DB_PATH", "data/stats.db"))
-        self.alerter = DiscordAlerter(webhook_url=os.getenv("DISCORD_WEBHOOK_URL", ""))
-        self.reward_handler = RewardHandler(self)
+        # Shared services
+        self.helix = HelixClient(
+            client_id=cfg.client_id,
+            client_secret=cfg.client_secret,
+            oauth_token=cfg.oauth_token,
+            refresh_token=cfg.refresh_token,
+        )
+        self.stats = StatsTracker(db_path=cfg.stats_db)
+        self.alerter = DiscordAlerter(webhook_url=cfg.discord_webhook)
+        self.clipper = Clipper(helix=self.helix, cfg=cfg)
+        self.highlight_mgr = HighlightManager(helix=self.helix, alerter=self.alerter, stats=self.stats)
+        self.stream_monitor = StreamMonitor(
+            helix=self.helix,
+            stats=self.stats,
+            alerter=self.alerter,
+            clipper=self.clipper,
+            cfg=cfg,
+        )
+        self.event_handler = EventHandler(bot=self)
+        self.reward_handler = RewardHandler(bot=self)
 
         # Register command cogs
         self.add_cog(general.GeneralCommands(self))
@@ -46,22 +65,41 @@ class TwitchBot(commands.Bot):
         self.add_cog(stats_cmds.StatsCommands(self))
 
     async def event_ready(self):
-        logger.info(f"Bot online | {self.nick}")
+        logger.info(f"✅ Bot online as {self.nick} | Watching: #{self.cfg.channel}")
         await self.stats.init_db()
+        self.stream_monitor.start()
 
     async def event_message(self, message):
         if message.echo:
             return
-
         await self.stats.record_message(message)
-        await self.clipper.check_auto_clip_trigger(message, self.broadcaster_id)
+        clip = await self.clipper.check_auto_clip_trigger(message, self.cfg.broadcaster_id)
+        if clip:
+            self.highlight_mgr.record_clip(clip)
+            await self.alerter.send_clip_alert(clip["edit_url"], triggered_by=message.author.name)
         await self.handle_commands(message)
 
     async def event_raid(self, raid):
         logger.info(f"Raid from {raid.raider.name} with {raid.viewer_count} viewers!")
-        if os.getenv("AUTO_CLIP_ON_RAID", "true").lower() == "true":
-            await self.clipper.create_clip(self.broadcaster_id, title=f"Raid from {raid.raider.name}")
         await self.alerter.send_raid_alert(raid.raider.name, raid.viewer_count)
+        await self.stats.record_event("raid", username=raid.raider.name, extra=str(raid.viewer_count))
+        if self.cfg.auto_clip_on_raid:
+            clip = await self.clipper.create_clip(
+                self.cfg.broadcaster_id, title=f"Raid from {raid.raider.name}"
+            )
+            if clip:
+                self.highlight_mgr.record_clip(clip)
+
+    # Delegate sub/cheer/follow events to EventHandler
+    async def event_usernotice_subscription(self, event):
+        await self.event_handler.on_sub(event)
+
+    async def event_usernotice_resubscription(self, event):
+        await self.event_handler.on_resub(event)
+
+    async def event_usernotice_giftsub(self, event):
+        await self.event_handler.on_giftsub(event)
 
     async def event_channel_points_redeemed(self, event):
         await self.reward_handler.handle(event)
+
