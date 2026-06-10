@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Twitch Bot Dashboard</title>
   <style>
+    /* ---- existing styles ---- */
     :root {
       --bg: #0e0e10;
       --card: #18181b;
@@ -41,7 +42,14 @@
     .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
     .badge-live { background: var(--red); color: #fff; }
     .badge-offline { background: #333; color: var(--muted); }
+    .badge-giveaway { background: #f59e0b; color: #000; animation: pulse 1.4s infinite; }
+    .badge-inactive { background: #333; color: var(--muted); }
     .total-msg { font-size: 2rem; font-weight: 800; color: var(--green); }
+    .death-count { font-size: 2.4rem; font-weight: 900; color: var(--red); }
+    .queue-item { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; display: flex; gap: 8px; }
+    .queue-item:last-child { border-bottom: none; }
+    .queue-pos { color: var(--purple); font-weight: 700; min-width: 22px; }
+    .queue-user { color: var(--muted); flex-shrink: 0; }
     footer { margin-top: 28px; text-align: center; font-size: 0.75rem; color: var(--muted); }
   </style>
 </head>
@@ -87,6 +95,25 @@
     <div class="card">
       <h2>🎬 This Session's Clips</h2>
       <div id="session-clips"><p style="color:var(--muted)">None yet this stream.</p></div>
+    </div>
+
+    <!-- Song Queue -->
+    <div class="card">
+      <h2>🎵 Song Request Queue</h2>
+      <div id="queue-list"><p style="color:var(--muted)">Queue is empty.</p></div>
+    </div>
+
+    <!-- Death Counter + Giveaway -->
+    <div class="card">
+      <h2>💀 Death Counter</h2>
+      <div class="death-count" id="death-count">0</div>
+      <div style="margin-top:20px">
+        <h2>🎉 Giveaway</h2>
+        <div id="giveaway-status">
+          <span id="giveaway-badge" class="badge badge-inactive">INACTIVE</span>
+          <span id="giveaway-entries" style="margin-left:10px;color:var(--muted);font-size:0.85rem"></span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -165,8 +192,35 @@
       `).join('');
     }
 
+    async function refreshQueue() {
+      const queue = await fetchJSON('/api/queue');
+      const el = document.getElementById('queue-list');
+      if (!queue || !queue.length) { el.innerHTML = '<p style="color:var(--muted)">Queue is empty. Use !sr in chat!</p>'; return; }
+      el.innerHTML = queue.slice(0,8).map((r, i) => `
+        <div class="queue-item">
+          <span class="queue-pos">${i+1}.</span>
+          <span class="queue-user">@${r.user}</span>
+          <span>${r.request}</span>
+        </div>`).join('');
+      if (queue.length > 8) el.innerHTML += `<div style="color:var(--muted);font-size:0.8rem;margin-top:6px">+${queue.length-8} more</div>`;
+    }
+
+    async function refreshGiveaway() {
+      const [ga, deaths] = await Promise.all([fetchJSON('/api/giveaway'), fetchJSON('/api/deaths')]);
+      if (ga) {
+        const badge = document.getElementById('giveaway-badge');
+        const entries = document.getElementById('giveaway-entries');
+        badge.className = ga.active ? 'badge badge-giveaway' : 'badge badge-inactive';
+        badge.textContent = ga.active ? '🎉 ACTIVE' : 'INACTIVE';
+        entries.textContent = ga.active ? `${ga.entries} entries` : '';
+      }
+      if (deaths) {
+        document.getElementById('death-count').textContent = deaths.count;
+      }
+    }
+
     async function refresh() {
-      await Promise.all([refreshStatus(), refreshStats(), refreshClips(), refreshSessionClips()]);
+      await Promise.all([refreshStatus(), refreshStats(), refreshClips(), refreshSessionClips(), refreshQueue(), refreshGiveaway()]);
     }
 
     refresh();

@@ -179,3 +179,40 @@ class HelixClient:
         if data and data.get("data"):
             return data["data"][0]
         return None
+
+    # ------------------------------------------------------------------ #
+    #  Channel management                                                  #
+    # ------------------------------------------------------------------ #
+
+    async def update_channel(
+        self,
+        broadcaster_id: str,
+        title: str = None,
+        game_id: str = None,
+    ) -> bool:
+        """PATCH /channels — update title and/or game. Requires channel:manage:broadcast scope."""
+        payload = {}
+        if title is not None:
+            payload["title"] = title
+        if game_id is not None:
+            payload["game_id"] = game_id
+        if not payload:
+            return False
+        async with httpx.AsyncClient() as client:
+            resp = await client.patch(
+                f"{BASE}/channels",
+                headers=await self._headers(),
+                params={"broadcaster_id": broadcaster_id},
+                json=payload,
+            )
+        if resp.status_code == 204:
+            return True
+        logger.error(f"PATCH /channels [{resp.status_code}]: {resp.text}")
+        return False
+
+    async def get_game_by_name(self, name: str) -> Optional[dict]:
+        """Look up a game by name. Returns the first match or None."""
+        data = await self._get("/games", params={"name": name})
+        if data and data.get("data"):
+            return data["data"][0]
+        return None

@@ -102,3 +102,31 @@ async def api_session_clips():
     if not _bot:
         return []
     return _bot.highlight_mgr._session_clips
+
+
+@app.get("/api/queue")
+async def api_queue():
+    if not _bot:
+        return []
+    cog = _bot.queue_cog
+    if not cog:
+        return []
+    return cog.queue
+
+
+@app.get("/api/giveaway")
+async def api_giveaway():
+    if not _bot:
+        return {"active": False, "entries": 0}
+    cog = _bot.fun_cog
+    if not cog:
+        return {"active": False, "entries": 0}
+    return {"active": cog.giveaway_active, "entries": cog.giveaway_entry_count}
+
+
+@app.get("/api/deaths")
+async def api_deaths():
+    if not _bot:
+        return {"count": 0}
+    count = await _bot.stats.get_deaths()
+    return {"count": count}

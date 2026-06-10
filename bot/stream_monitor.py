@@ -17,11 +17,12 @@ POLL_INTERVAL = 30  # seconds
 
 
 class StreamMonitor:
-    def __init__(self, helix, stats, alerter, clipper, cfg):
+    def __init__(self, helix, stats, alerter, clipper, highlight_mgr, cfg):
         self.helix = helix
         self.stats = stats
         self.alerter = alerter
         self.clipper = clipper
+        self.highlight_mgr = highlight_mgr
         self.cfg = cfg
 
         self._live: bool = False
@@ -94,6 +95,8 @@ class StreamMonitor:
 
         # Suggest highlights from this session's clips
         await self._suggest_highlights()
+        # Post highlight candidates to Discord via highlight manager
+        await self.highlight_mgr.process_end_of_stream(self.cfg.broadcaster_id)
 
     async def _check_hype_train(self):
         hype = await self.helix.get_hype_train(self.cfg.broadcaster_id)

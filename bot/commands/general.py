@@ -13,7 +13,13 @@ class GeneralCommands(commands.Cog):
     @commands.command(name="commands")
     async def cmd_commands(self, ctx: commands.Context):
         await ctx.send(
-            "📋 Commands: !clip | !clips | !topclips | !mystats | !topchatters | !so <user> | !lurk | !game | !title"
+            "📋 Commands: "
+            "!clip | !clips | !topclips | "
+            "!sr | !queue | !mypos | "
+            "!mystats | !topchatters | "
+            "!so <user> | !lurk | !game | !title | !uptime | "
+            "!8ball | !dice | !coinflip | !rng | !hug | !slap | "
+            "!deaths"
         )
 
     @commands.command(name="lurk")

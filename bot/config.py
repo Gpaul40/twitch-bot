@@ -41,6 +41,11 @@ class Config:
     auto_clip_on_raid: bool = True
     auto_clip_on_hype_train: bool = True
 
+    # --- Automation ---
+    welcome_new_chatters: bool = True
+    auto_so_on_raid: bool = True
+    scheduled_msg_interval: int = 1800  # seconds between periodic messages
+
     # --- Discord ---
     discord_webhook: str = ""
 
@@ -69,6 +74,9 @@ class Config:
             clip_triggers=triggers,
             auto_clip_on_raid=_optional("AUTO_CLIP_ON_RAID", "true").lower() == "true",
             auto_clip_on_hype_train=_optional("AUTO_CLIP_ON_HYPE_TRAIN", "true").lower() == "true",
+            welcome_new_chatters=_optional("WELCOME_NEW_CHATTERS", "true").lower() == "true",
+            auto_so_on_raid=_optional("AUTO_SO_ON_RAID", "true").lower() == "true",
+            scheduled_msg_interval=int(_optional("SCHEDULED_MSG_INTERVAL", "1800")),
             discord_webhook=_optional("DISCORD_WEBHOOK_URL"),
             dashboard_host=_optional("DASHBOARD_HOST", "0.0.0.0"),
             dashboard_port=int(_optional("DASHBOARD_PORT", "8080")),
