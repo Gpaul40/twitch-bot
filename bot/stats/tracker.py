@@ -126,6 +126,14 @@ class StatsTracker:
             row = await cursor.fetchone()
             return row[0] if row else 0
 
+    async def record_clip(self, clip_id: str, url: str, triggered_by: str = ""):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "INSERT INTO clips (clip_id, edit_url, triggered_by) VALUES (?, ?, ?)",
+                (clip_id, url, triggered_by),
+            )
+            await db.commit()
+
     async def get_deaths(self) -> int:
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute("SELECT count FROM death_counter WHERE id = 1")

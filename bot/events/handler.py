@@ -4,6 +4,7 @@ Responds in chat and fires Discord alerts.
 """
 
 import logging
+from bot.clipping.clipper import Clipper
 
 logger = logging.getLogger("bot.events")
 
@@ -83,8 +84,9 @@ class EventHandler:
                         title=f"{bits} bit cheer by {username}",
                     )
                     if clip:
+                        url = Clipper.public_url(clip)
                         self.bot.highlight_mgr.record_clip(clip)
-                        await self.bot.alerter.send_clip_alert(clip["edit_url"], triggered_by=f"{username} ({bits} bits)")
+                        await self.bot.alerter.send_clip_alert(url, triggered_by=f"{username} ({bits} bits)")
                 break
 
     # ------------------------------------------------------------------ #

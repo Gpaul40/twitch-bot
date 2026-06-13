@@ -54,7 +54,7 @@ class TwitchBot(commands.Bot):
         )
         self.stats = StatsTracker(db_path=cfg.stats_db)
         self.alerter = DiscordAlerter(webhook_url=cfg.discord_webhook)
-        self.clipper = Clipper(helix=self.helix, cfg=cfg)
+        self.clipper = Clipper(helix=self.helix, cfg=cfg, stats=self.stats)
         self.highlight_mgr = HighlightManager(helix=self.helix, alerter=self.alerter, stats=self.stats)
         self.stream_monitor = StreamMonitor(
             helix=self.helix,
@@ -109,8 +109,10 @@ class TwitchBot(commands.Bot):
                     f"👋 Welcome to the stream, @{message.author.name}! 🎮 Use !commands to see what I can do!"
                 )
 
-        # Auto-clip on keyword trigger
-        clip = await self.clipper.check_auto_clip_trigger(message, self.cfg.broadcaster_id)
+        # Auto-clip on keyword trigger (only when live)
+        clip = await self.clipper.check_auto_clip_trigger(
+            message, self.cfg.broadcaster_id, is_live=self.stream_monitor.is_live
+        )
         if clip:
             self.highlight_mgr.record_clip(clip)
             await self.alerter.send_clip_alert(clip["edit_url"], triggered_by=message.author.name)
