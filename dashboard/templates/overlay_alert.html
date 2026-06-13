@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: transparent;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .alert {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: rgba(0,0,0,0.88);
+      border: 2px solid rgba(0,180,255,0.7);
+      border-radius: 16px;
+      padding: 16px 28px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 0 30px rgba(0,180,255,0.3);
+      opacity: 0;
+      transform: scale(0.8) translateY(20px);
+      transition: opacity .3s, transform .3s;
+    }
+    .alert.show {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+    .scissors { font-size: 2.2rem; }
+    .text { display: flex; flex-direction: column; }
+    .title { font-size: 1.4rem; font-weight: 900; color: #00b4ff; letter-spacing: .04em; }
+    .sub { font-size: .8rem; color: rgba(255,255,255,0.55); margin-top: 2px; }
+    .sub span { color: rgba(255,255,255,0.9); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="alert" id="alert">
+    <div class="scissors">✂️</div>
+    <div class="text">
+      <div class="title">CLIPPED!</div>
+      <div class="sub">by <span id="clipped-by">chat</span></div>
+    </div>
+  </div>
+  <script>
+    let lastCount = 0;
+    async function poll() {
+      try {
+        const r = await fetch('/api/last_clip');
+        const d = await r.json();
+        if (d && d.count !== lastCount) {
+          lastCount = d.count;
+          document.getElementById('clipped-by').textContent = d.triggered_by || 'chat';
+          const el = document.getElementById('alert');
+          el.classList.add('show');
+          setTimeout(() => el.classList.remove('show'), 4000);
+        }
+      } catch {}
+      setTimeout(poll, 2000);
+    }
+    poll();
+  </script>
+</body>
+</html>

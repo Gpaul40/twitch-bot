@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: transparent;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    .container {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: rgba(0,0,0,0.75);
+      border: 2px solid rgba(145,70,255,0.5);
+      border-radius: 14px;
+      padding: 14px 24px;
+      backdrop-filter: blur(8px);
+    }
+    .block { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .val { font-size: 2.8rem; font-weight: 900; line-height: 1; }
+    .val-w { color: #00e676; }
+    .val-l { color: #ff4040; }
+    .lbl { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,0.45); }
+    .sep { font-size: 2rem; color: rgba(255,255,255,0.2); padding: 0 4px; }
+    .val.pop { animation: pop .35s ease; }
+    @keyframes pop { 0%{transform:scale(1)} 50%{transform:scale(1.25)} 100%{transform:scale(1)} }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="block">
+      <div class="val val-w" id="wins">0</div>
+      <div class="lbl">Wins</div>
+    </div>
+    <div class="sep">—</div>
+    <div class="block">
+      <div class="val val-l" id="losses">0</div>
+      <div class="lbl">Losses</div>
+    </div>
+  </div>
+  <script>
+    let lastW = 0, lastL = 0;
+    function pop(id) {
+      const el = document.getElementById(id);
+      el.classList.remove('pop');
+      void el.offsetWidth;
+      el.classList.add('pop');
+    }
+    async function poll() {
+      try {
+        const r = await fetch('/api/wl');
+        const d = await r.json();
+        if (d.wins !== lastW) { pop('wins'); lastW = d.wins; }
+        if (d.losses !== lastL) { pop('losses'); lastL = d.losses; }
+        document.getElementById('wins').textContent = d.wins;
+        document.getElementById('losses').textContent = d.losses;
+      } catch {}
+      setTimeout(poll, 3000);
+    }
+    poll();
+  </script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: transparent;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    .container {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: rgba(0,0,0,0.75);
+      border: 2px solid rgba(255,64,64,0.6);
+      border-radius: 14px;
+      padding: 14px 24px;
+      backdrop-filter: blur(8px);
+    }
+    .skull { font-size: 2.4rem; }
+    .right { display: flex; flex-direction: column; }
+    .label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,0.5); }
+    .count { font-size: 3rem; font-weight: 900; color: #ff4040; line-height: 1; }
+    .count.bump { animation: bump .3s ease; }
+    @keyframes bump { 0%{transform:scale(1)} 50%{transform:scale(1.3)} 100%{transform:scale(1)} }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="skull">💀</div>
+    <div class="right">
+      <div class="label">Deaths</div>
+      <div class="count" id="count">0</div>
+    </div>
+  </div>
+  <script>
+    let last = 0;
+    async function poll() {
+      try {
+        const r = await fetch('/api/deaths');
+        const d = await r.json();
+        const el = document.getElementById('count');
+        if (d.count !== last) {
+          el.classList.remove('bump');
+          void el.offsetWidth;
+          el.classList.add('bump');
+          last = d.count;
+        }
+        el.textContent = d.count;
+      } catch {}
+      setTimeout(poll, 3000);
+    }
+    poll();
+  </script>
+</body>
+</html>

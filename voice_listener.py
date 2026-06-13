@@ -78,6 +78,10 @@ VOICE_RULES = [
     (r"\b(we won|and game|game over|gg easy|we'?re winning)\b",        "w",    None),
     (r"\b(chat w|chat that'?s a w)\b",                                 "w",    None),
 
+    # ── WIN / LOSS (W/L tracker) ──────────────────────────────────────
+    (r"\b(take the w|got the w|we got the w|that'?s a win|we win)\b",  "win",  None),
+    (r"\b(take the l|we lost|that'?s a l|they won|we got beat)\b",     "loss", None),
+
     # ── RIGGED ────────────────────────────────────────────────────────────
     (r"\b(this (game )?is rigged|that'?s rigged|rigged|scripted)\b",   "rigged", None),
     (r"\b(2k (scripted|rigged|hates me)|2k is crazy)\b",               "rigged", None),

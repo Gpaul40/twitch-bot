@@ -3,8 +3,590 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Twitch Bot Dashboard</title>
+  <title>Stream Control Centre</title>
   <style>
+    :root {
+      --bg: #0a0a0c;
+      --surface: #111114;
+      --card: #18181c;
+      --border: #2a2a30;
+      --purple: #9146ff;
+      --purple-dim: #7b3fe4;
+      --green: #00e676;
+      --red: #ff4040;
+      --orange: #ff9000;
+      --blue: #00b4ff;
+      --yellow: #ffd600;
+      --text: #efeff1;
+      --muted: #9a9ab0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+    /* ── NAV ── */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-brand {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--purple);
+      padding: 16px 24px 16px 0;
+      margin-right: 16px;
+      border-right: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .nav-tab {
+      padding: 16px 18px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .nav-tab:hover { color: var(--text); }
+    .nav-tab.active { color: var(--purple); border-bottom-color: var(--purple); }
+    .nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; }
+    .badge-live { background: rgba(255,64,64,.15); color: var(--red); border: 1px solid rgba(255,64,64,.3); }
+    .badge-offline { background: rgba(255,255,255,.06); color: var(--muted); border: 1px solid var(--border); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot-live { background: var(--red); animation: pulse 1.4s infinite; }
+    .dot-offline { background: #555; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    /* ── PANELS ── */
+    .panel { display: none; padding: 24px; }
+    .panel.active { display: block; }
+
+    /* ── GRID ── */
+    .grid { display: grid; gap: 16px; }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    @media(max-width:1100px) { .grid-3,.grid-4 { grid-template-columns: repeat(2,1fr); } }
+    @media(max-width:700px) { .grid-3,.grid-4,.grid-2 { grid-template-columns: 1fr; } }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+    }
+    .card-label {
+      font-size: 0.74rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    /* ── STREAM CARD ── */
+    .stream-thumb { width: 100%; aspect-ratio:16/9; border-radius: 8px; object-fit:cover; background:#111; display:block; margin-bottom:12px; }
+    .stream-title { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+    .stream-meta { font-size: 0.83rem; color: var(--muted); }
+    .viewers-num { color: var(--red); font-weight: 700; }
+
+    /* ── STAT TILES ── */
+    .stat-tile {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .stat-tile .val { font-size: 2.4rem; font-weight: 900; line-height: 1; }
+    .stat-tile .lbl { font-size: 0.78rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing:.05em; }
+    .val-red { color: var(--red); }
+    .val-green { color: var(--green); }
+    .val-purple { color: var(--purple); }
+    .val-orange { color: var(--orange); }
+    .val-blue { color: var(--blue); }
+
+    /* ── CONTROL BUTTONS ── */
+    .btn-grid { display: grid; gap: 12px; }
+    .btn-grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .btn-grid-2 { grid-template-columns: repeat(2, 1fr); }
+    @media(max-width:700px) { .btn-grid-3,.btn-grid-2 { grid-template-columns: 1fr 1fr; } }
+    .ctrl-btn {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 8px; padding: 20px 12px;
+      border-radius: 12px; border: 1px solid var(--border);
+      background: var(--card); color: var(--text);
+      font-size: 0.9rem; font-weight: 700;
+      cursor: pointer; transition: all .15s;
+      text-align: center; line-height: 1.3;
+    }
+    .ctrl-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+    .ctrl-btn:active { transform: translateY(0); }
+    .ctrl-btn .icon { font-size: 1.8rem; }
+    .ctrl-btn.clip   { border-color: rgba(0,180,255,.3); } .ctrl-btn.clip:hover   { background: rgba(0,180,255,.1); border-color: var(--blue); }
+    .ctrl-btn.death  { border-color: rgba(255,64,64,.3); } .ctrl-btn.death:hover  { background: rgba(255,64,64,.1); border-color: var(--red); }
+    .ctrl-btn.hype   { border-color: rgba(255,144,0,.3); } .ctrl-btn.hype:hover   { background: rgba(255,144,0,.1); border-color: var(--orange); }
+    .ctrl-btn.w      { border-color: rgba(0,230,118,.3); } .ctrl-btn.w:hover      { background: rgba(0,230,118,.1); border-color: var(--green); }
+    .ctrl-btn.rigged { border-color: rgba(255,64,64,.2); } .ctrl-btn.rigged:hover { background: rgba(255,64,64,.08); border-color: rgba(255,64,64,.5); }
+    .ctrl-btn.clutch { border-color: rgba(145,70,255,.3); } .ctrl-btn.clutch:hover { background: rgba(145,70,255,.1); border-color: var(--purple); }
+    .ctrl-btn.gg     { border-color: rgba(255,214,0,.3); } .ctrl-btn.gg:hover     { background: rgba(255,214,0,.08); border-color: var(--yellow); }
+    .ctrl-btn.reset  { border-color: rgba(255,64,64,.2); } .ctrl-btn.reset:hover  { background: rgba(255,64,64,.06); }
+    .ctrl-btn.win    { border-color: rgba(0,230,118,.3); } .ctrl-btn.win:hover    { background: rgba(0,230,118,.1); border-color: var(--green); }
+    .ctrl-btn.loss   { border-color: rgba(255,64,64,.3); } .ctrl-btn.loss:hover   { background: rgba(255,64,64,.1); border-color: var(--red); }
+    .ctrl-btn.gstart { border-color: rgba(255,214,0,.3); } .ctrl-btn.gstart:hover { background: rgba(255,214,0,.08); border-color: var(--yellow); }
+    .ctrl-btn.gdraw  { border-color: rgba(255,144,0,.3); } .ctrl-btn.gdraw:hover  { background: rgba(255,144,0,.1); border-color: var(--orange); }
+
+    .btn-flash { animation: flash .4s; }
+    @keyframes flash { 0%{opacity:1} 50%{opacity:.3} 100%{opacity:1} }
+    .toast { position: fixed; bottom: 28px; right: 28px; background: var(--purple); color:#fff; padding: 12px 20px; border-radius: 10px; font-size: 0.88rem; font-weight: 600; z-index: 9999; opacity:0; transform: translateY(20px); transition: all .25s; pointer-events:none; }
+    .toast.show { opacity:1; transform: translateY(0); }
+
+    /* ── ROWS ── */
+    .row { display:flex; justify-content:space-between; align-items:center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .row:last-child { border-bottom: none; }
+    .row-val { font-weight: 700; color: var(--purple); }
+
+    /* ── CLIPS ── */
+    .clip-item { display:flex; gap:12px; padding:10px 0; border-bottom: 1px solid var(--border); }
+    .clip-item:last-child { border-bottom: none; }
+    .clip-thumb { width:96px; height:54px; border-radius:6px; object-fit:cover; background:#111; flex-shrink:0; }
+    .clip-title a { color: var(--purple); text-decoration:none; font-size:.9rem; font-weight:600; }
+    .clip-title a:hover { text-decoration: underline; }
+    .clip-views { font-size:.78rem; color:var(--muted); margin-top:2px; }
+
+    /* ── QUEUE ── */
+    .q-item { display:flex; gap:10px; padding:8px 0; border-bottom: 1px solid var(--border); font-size:.88rem; }
+    .q-item:last-child { border-bottom:none; }
+    .q-pos { color: var(--purple); font-weight:700; min-width:22px; }
+    .q-user { color: var(--muted); flex-shrink:0; }
+
+    /* ── OVERLAYS PANEL ── */
+    .overlay-card { display:flex; flex-direction:column; gap:10px; }
+    .overlay-url { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-family: monospace; font-size:.83rem; color: var(--blue); word-break:break-all; }
+    .copy-btn { background: var(--purple); color:#fff; border:none; border-radius:6px; padding:6px 14px; font-size:.8rem; font-weight:600; cursor:pointer; align-self:flex-start; }
+    .copy-btn:hover { background: var(--purple-dim); }
+    .overlay-preview { width:100%; aspect-ratio:16/3; border:1px solid var(--border); border-radius:8px; background:#000; overflow:hidden; }
+    .overlay-preview iframe { width:100%; height:100%; border:none; }
+
+    /* ── W/L ── */
+    .wl-display { display:flex; gap:16px; align-items:center; justify-content:center; padding: 20px 0; }
+    .wl-num { font-size: 3.5rem; font-weight: 900; line-height:1; }
+
+    footer { padding: 24px; text-align:center; font-size:.75rem; color: var(--muted); }
+    footer a { color: var(--purple); text-decoration:none; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">🤖 Stream HQ</div>
+  <div class="nav-tab active" onclick="switchTab('overview', this)">Overview</div>
+  <div class="nav-tab" onclick="switchTab('control', this)">⚡ Control</div>
+  <div class="nav-tab" onclick="switchTab('clips', this)">✂️ Clips</div>
+  <div class="nav-tab" onclick="switchTab('queue', this)">🎵 Queue</div>
+  <div class="nav-tab" onclick="switchTab('overlays', this)">📺 OBS Overlays</div>
+  <div class="nav-right">
+    <span id="live-badge" class="badge badge-offline"><span id="live-dot" class="dot dot-offline"></span> OFFLINE</span>
+    <span id="uptime-nav" style="font-size:.8rem;color:var(--muted)"></span>
+  </div>
+</nav>
+
+<!-- ═══════════════════════ OVERVIEW ═══════════════════════ -->
+<div id="panel-overview" class="panel active">
+  <div class="grid grid-4" style="margin-bottom:16px">
+    <div class="stat-tile">
+      <div class="lbl">👁 Viewers</div>
+      <div class="val val-red" id="stat-viewers">—</div>
+    </div>
+    <div class="stat-tile">
+      <div class="lbl">💀 Deaths</div>
+      <div class="val val-red" id="stat-deaths">0</div>
+    </div>
+    <div class="stat-tile">
+      <div class="lbl">🏆 W/L</div>
+      <div class="val val-green" id="stat-wl">0 / 0</div>
+    </div>
+    <div class="stat-tile">
+      <div class="lbl">💬 Messages</div>
+      <div class="val val-purple" id="stat-msgs">—</div>
+    </div>
+  </div>
+
+  <div class="grid grid-3">
+    <!-- Stream Status -->
+    <div class="card">
+      <div class="card-label">📺 Stream Status</div>
+      <div id="stream-content"><p style="color:var(--muted)">Checking...</p></div>
+    </div>
+
+    <!-- Top Chatters -->
+    <div class="card">
+      <div class="card-label">🏆 Top Chatters</div>
+      <div id="top-chatters"><p style="color:var(--muted)">Loading...</p></div>
+    </div>
+
+    <!-- Events -->
+    <div class="card">
+      <div class="card-label">📊 Events This Stream</div>
+      <div id="events-list"><p style="color:var(--muted)">No events yet.</p></div>
+    </div>
+  </div>
+
+  <div class="grid grid-2" style="margin-top:16px">
+    <!-- Session Clips -->
+    <div class="card">
+      <div class="card-label">🎬 Clips This Session</div>
+      <div id="session-clips"><p style="color:var(--muted)">None yet.</p></div>
+    </div>
+    <!-- Giveaway -->
+    <div class="card">
+      <div class="card-label">🎉 Giveaway</div>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <span id="giveaway-badge" class="badge badge-offline">INACTIVE</span>
+        <span id="giveaway-entries" style="color:var(--muted);font-size:.88rem"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ CONTROL ═══════════════════════ -->
+<div id="panel-control" class="panel">
+  <div class="grid" style="gap:20px">
+
+    <!-- Quick Actions -->
+    <div class="card">
+      <div class="card-label">⚡ Quick Actions</div>
+      <div class="btn-grid btn-grid-3">
+        <button class="ctrl-btn clip"   onclick="voiceCmd('clip')"><span class="icon">✂️</span>Clip That</button>
+        <button class="ctrl-btn hype"   onclick="voiceCmd('hype')"><span class="icon">🔥</span>Hype</button>
+        <button class="ctrl-btn w"      onclick="voiceCmd('w')"><span class="icon">🏆</span>W in Chat</button>
+        <button class="ctrl-btn clutch" onclick="voiceCmd('clutch')"><span class="icon">🧊</span>Clutch</button>
+        <button class="ctrl-btn rigged" onclick="voiceCmd('rigged')"><span class="icon">💀</span>Rigged</button>
+        <button class="ctrl-btn gg"     onclick="voiceCmd('gg')"><span class="icon">🤝</span>GG</button>
+      </div>
+    </div>
+
+    <!-- Death Counter -->
+    <div class="card">
+      <div class="card-label">💀 Death Counter</div>
+      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+        <div style="text-align:center">
+          <div style="font-size:4rem;font-weight:900;color:var(--red);line-height:1" id="ctrl-deaths">0</div>
+          <div style="font-size:.78rem;color:var(--muted);margin-top:4px">Deaths</div>
+        </div>
+        <div class="btn-grid btn-grid-2" style="flex:1;min-width:200px">
+          <button class="ctrl-btn death" onclick="voiceCmd('death')" style="padding:16px"><span class="icon">💀</span>+ Death</button>
+          <button class="ctrl-btn reset" onclick="postCmd('/api/voice_action','reset_deaths')" style="padding:16px"><span class="icon">🔄</span>Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- W/L Tracker -->
+    <div class="card">
+      <div class="card-label">🎮 Game W/L Tracker</div>
+      <div class="wl-display">
+        <div style="text-align:center">
+          <div class="wl-num val-green" id="ctrl-wins">0</div>
+          <div style="font-size:.8rem;color:var(--muted);margin-top:2px">WINS</div>
+        </div>
+        <div style="font-size:2rem;color:var(--muted)">—</div>
+        <div style="text-align:center">
+          <div class="wl-num val-red" id="ctrl-losses">0</div>
+          <div style="font-size:.8rem;color:var(--muted);margin-top:2px">LOSSES</div>
+        </div>
+      </div>
+      <div class="btn-grid btn-grid-3">
+        <button class="ctrl-btn win"  onclick="voiceCmd('win')"><span class="icon">✅</span>+Win</button>
+        <button class="ctrl-btn loss" onclick="voiceCmd('loss')"><span class="icon">❌</span>+Loss</button>
+        <button class="ctrl-btn reset" onclick="postCmd('/api/voice_action','reset_wl')"><span class="icon">🔄</span>Reset</button>
+      </div>
+    </div>
+
+    <!-- Giveaway -->
+    <div class="card">
+      <div class="card-label">🎉 Giveaway Controls</div>
+      <div class="btn-grid btn-grid-2">
+        <button class="ctrl-btn gstart" onclick="voiceCmd('giveaway_start')"><span class="icon">🎉</span>Start Giveaway</button>
+        <button class="ctrl-btn gdraw"  onclick="voiceCmd('giveaway_draw')"><span class="icon">🎰</span>Draw Winner</button>
+      </div>
+      <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
+        <span id="ctrl-giveaway-badge" class="badge badge-offline">INACTIVE</span>
+        <span id="ctrl-giveaway-entries" style="color:var(--muted);font-size:.85rem"></span>
+      </div>
+    </div>
+
+    <!-- Shoutout -->
+    <div class="card">
+      <div class="card-label">🎙️ Shoutout User</div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <input id="so-input" type="text" placeholder="Username..." style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:.9rem;outline:none;" onkeydown="if(event.key==='Enter')sendSO()">
+        <button onclick="sendSO()" style="background:var(--purple);color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:.9rem;font-weight:700;cursor:pointer;">SO!</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ CLIPS ═══════════════════════ -->
+<div id="panel-clips" class="panel">
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-label">🎬 This Session</div>
+      <div id="clips-session"><p style="color:var(--muted)">No clips this session yet.</p></div>
+    </div>
+    <div class="card" style="grid-column:span 1">
+      <div class="card-label">📈 Top Clips (All Time)</div>
+      <div id="clips-top"><p style="color:var(--muted)">Loading...</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ QUEUE ═══════════════════════ -->
+<div id="panel-queue" class="panel">
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-label">🎵 Song Request Queue</div>
+      <div id="queue-list"><p style="color:var(--muted)">Queue is empty.</p></div>
+    </div>
+    <div class="card">
+      <div class="card-label">ℹ️ Queue Commands</div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:.88rem">
+        <div class="row"><span>Add a song</span><span class="row-val">!sr &lt;song&gt;</span></div>
+        <div class="row"><span>Check position</span><span class="row-val">!mypos</span></div>
+        <div class="row"><span>View queue</span><span class="row-val">!queue</span></div>
+        <div class="row"><span>Next song (mod)</span><span class="row-val">!nextq</span></div>
+        <div class="row"><span>Clear queue (mod)</span><span class="row-val">!clearq</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ OBS OVERLAYS ═══════════════════════ -->
+<div id="panel-overlays" class="panel">
+  <div style="background:rgba(145,70,255,.08);border:1px solid rgba(145,70,255,.2);border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:.88rem;color:var(--muted)">
+    💡 <strong style="color:var(--text)">How to use:</strong> In OBS, add a <strong>Browser Source</strong> and paste the URL. These overlays update live automatically.
+  </div>
+  <div class="grid grid-3">
+    <div class="card overlay-card">
+      <div class="card-label">💀 Death Counter Overlay</div>
+      <div class="overlay-url" id="url-deaths">http://localhost:8080/overlay/deaths</div>
+      <button class="copy-btn" onclick="copyUrl('url-deaths')">Copy URL</button>
+      <div style="font-size:.8rem;color:var(--muted)">Shows death count. Suggested size: 250×120px</div>
+      <div class="overlay-preview"><iframe src="/overlay/deaths" scrolling="no"></iframe></div>
+    </div>
+    <div class="card overlay-card">
+      <div class="card-label">🏆 W/L Tracker Overlay</div>
+      <div class="overlay-url" id="url-wl">http://localhost:8080/overlay/wl</div>
+      <button class="copy-btn" onclick="copyUrl('url-wl')">Copy URL</button>
+      <div style="font-size:.8rem;color:var(--muted)">Shows wins and losses. Suggested size: 300×120px</div>
+      <div class="overlay-preview"><iframe src="/overlay/wl" scrolling="no"></iframe></div>
+    </div>
+    <div class="card overlay-card">
+      <div class="card-label">🔔 Clip Alert Overlay</div>
+      <div class="overlay-url" id="url-alert">http://localhost:8080/overlay/alert</div>
+      <button class="copy-btn" onclick="copyUrl('url-alert')">Copy URL</button>
+      <div style="font-size:.8rem;color:var(--muted)">Pops up "CLIPPED!" when a clip is made. Full screen source.</div>
+      <div class="overlay-preview"><iframe src="/overlay/alert" scrolling="no"></iframe></div>
+    </div>
+  </div>
+</div>
+
+<footer>Auto-refreshes every 15s &nbsp;•&nbsp; <a href="https://dashboard.twitch.tv/videos" target="_blank">Promote clips → Highlights ↗</a></footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── TAB SWITCHING ──
+  function switchTab(id, el) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('panel-' + id).classList.add('active');
+    el.classList.add('active');
+  }
+
+  // ── TOAST ──
+  function toast(msg, col) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.background = col || 'var(--purple)';
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // ── API CALLS ──
+  async function fetchJSON(url) {
+    try { return await (await fetch(url)).json(); } catch { return null; }
+  }
+
+  async function voiceCmd(cmd, arg = '') {
+    const r = await fetchJSON('/api/voice'); // warmup — actually POST:
+    try {
+      const res = await fetch('/api/voice', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({command: cmd, arg})
+      });
+      const data = await res.json();
+      if (data.ok) {
+        toast('✅ ' + cmd.toUpperCase() + (data.result ? ': ' + data.result : ''), 'var(--green)');
+      } else {
+        toast('⚠️ ' + (data.error || 'Failed'), 'var(--red)');
+      }
+    } catch(e) { toast('❌ Bot not connected', 'var(--red)'); }
+    refresh();
+  }
+
+  async function postCmd(url, action) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({action})
+      });
+      const data = await res.json();
+      if (data.ok) toast('✅ ' + action, 'var(--green)');
+      else toast('⚠️ ' + (data.error || 'Failed'), 'var(--red)');
+    } catch { toast('❌ Bot not connected', 'var(--red)'); }
+    refresh();
+  }
+
+  function sendSO() {
+    const u = document.getElementById('so-input').value.trim().replace('@','');
+    if (!u) return;
+    voiceCmd('shoutout', u);
+    document.getElementById('so-input').value = '';
+  }
+
+  function copyUrl(id) {
+    const url = document.getElementById(id).textContent;
+    navigator.clipboard.writeText(url);
+    toast('📋 Copied!', 'var(--purple)');
+  }
+
+  // ── REFRESH ──
+  async function refreshStatus() {
+    const data = await fetchJSON('/api/status');
+    if (!data) return;
+    const badge = document.getElementById('live-badge');
+    const dot = document.getElementById('live-dot');
+    const uptime = document.getElementById('uptime-nav');
+    if (data.live && data.stream) {
+      badge.className = 'badge badge-live'; badge.innerHTML = '<span class="dot dot-live"></span> LIVE';
+      dot.className = 'dot dot-live';
+      const s = data.stream;
+      document.getElementById('stream-content').innerHTML = `
+        <img class="stream-thumb" src="${s.thumbnail||''}" onerror="this.style.display='none'" alt="">
+        <div class="stream-title">${s.title||''}</div>
+        <div class="stream-meta">🎮 ${s.game||'Unknown'} &nbsp;•&nbsp; <span class="viewers-num">👁 ${(s.viewers||0).toLocaleString()}</span></div>
+      `;
+      document.getElementById('stat-viewers').textContent = (s.viewers||0).toLocaleString();
+      uptime.textContent = data.uptime || '';
+    } else {
+      badge.className = 'badge badge-offline'; badge.innerHTML = '<span class="dot dot-offline"></span> OFFLINE';
+      document.getElementById('stream-content').innerHTML = `<p style="color:var(--muted)">Channel is offline.</p>`;
+      document.getElementById('stat-viewers').textContent = '—';
+      uptime.textContent = '';
+    }
+  }
+
+  async function refreshStats() {
+    const data = await fetchJSON('/api/stats');
+    if (!data) return;
+    const total = (data.total_messages||0).toLocaleString();
+    document.getElementById('stat-msgs').textContent = total;
+
+    const topEl = document.getElementById('top-chatters');
+    topEl.innerHTML = (data.top_chatters||[]).length
+      ? data.top_chatters.map((c,i) => `<div class="row"><span>${['🥇','🥈','🥉','4.','5.','6.','7.','8.','9.','10.'][i]||''} ${c.user}</span><span class="row-val">${c.count.toLocaleString()}</span></div>`).join('')
+      : '<p style="color:var(--muted)">No chat data yet.</p>';
+
+    const evtEl = document.getElementById('events-list');
+    evtEl.innerHTML = (data.events||[]).length
+      ? data.events.map(e => `<div class="row"><span>${e.type}</span><span class="row-val">${e.count}</span></div>`).join('')
+      : '<p style="color:var(--muted)">No events yet.</p>';
+  }
+
+  async function refreshClips() {
+    const [top, session] = await Promise.all([fetchJSON('/api/clips'), fetchJSON('/api/session_clips')]);
+
+    const topEl = document.getElementById('clips-top');
+    topEl.innerHTML = (top||[]).length ? top.map(c=>`
+      <div class="clip-item">
+        <img class="clip-thumb" src="${c.thumbnail||''}" onerror="this.style.display='none'" alt="">
+        <div>
+          <div class="clip-title"><a href="${c.url||'#'}" target="_blank">${c.title||'Untitled'}</a></div>
+          <div class="clip-views">👁 ${(c.views||0).toLocaleString()} views</div>
+        </div>
+      </div>`).join('') : '<p style="color:var(--muted)">No clips found.</p>';
+
+    const sessEl = document.getElementById('clips-session');
+    const overviewSess = document.getElementById('session-clips');
+    if ((session||[]).length) {
+      const html = session.map(c=>`<div class="row"><span>✂️ ${c.title||c.id||'Clip'}</span><span style="font-size:.78rem;color:var(--muted)">${(c.recorded_at||'').split('T')[1]?.slice(0,5)||''}</span></div>`).join('');
+      sessEl.innerHTML = html;
+      overviewSess.innerHTML = html;
+    } else {
+      sessEl.innerHTML = '<p style="color:var(--muted)">No clips this session yet.</p>';
+      overviewSess.innerHTML = '<p style="color:var(--muted)">None yet.</p>';
+    }
+  }
+
+  async function refreshQueue() {
+    const queue = await fetchJSON('/api/queue');
+    const el = document.getElementById('queue-list');
+    if (!(queue||[]).length) { el.innerHTML = '<p style="color:var(--muted)">Empty. Chat can use !sr &lt;song&gt;</p>'; return; }
+    el.innerHTML = queue.slice(0,10).map((r,i)=>`
+      <div class="q-item"><span class="q-pos">${i+1}.</span><span class="q-user">@${r.user}</span><span>${r.request}</span></div>`).join('')
+      + (queue.length>10 ? `<div style="color:var(--muted);font-size:.8rem;margin-top:6px">+${queue.length-10} more</div>` : '');
+  }
+
+  async function refreshGiveaway() {
+    const ga = await fetchJSON('/api/giveaway');
+    if (!ga) return;
+    ['giveaway-badge','ctrl-giveaway-badge'].forEach(id=>{
+      const b = document.getElementById(id);
+      if (!b) return;
+      b.className = ga.active ? 'badge badge-live' : 'badge badge-offline';
+      b.textContent = ga.active ? '🎉 ACTIVE' : 'INACTIVE';
+    });
+    ['giveaway-entries','ctrl-giveaway-entries'].forEach(id=>{
+      const e = document.getElementById(id);
+      if (e) e.textContent = ga.active ? `${ga.entries} entries` : '';
+    });
+  }
+
+  async function refreshDeathsWL() {
+    const [deaths, wl] = await Promise.all([fetchJSON('/api/deaths'), fetchJSON('/api/wl')]);
+    if (deaths) {
+      document.getElementById('stat-deaths').textContent = deaths.count;
+      document.getElementById('ctrl-deaths').textContent = deaths.count;
+    }
+    if (wl) {
+      document.getElementById('stat-wl').textContent = `${wl.wins} / ${wl.losses}`;
+      document.getElementById('ctrl-wins').textContent = wl.wins;
+      document.getElementById('ctrl-losses').textContent = wl.losses;
+    }
+  }
+
+  async function refresh() {
+    await Promise.all([refreshStatus(), refreshStats(), refreshClips(), refreshQueue(), refreshGiveaway(), refreshDeathsWL()]);
+  }
+
+  refresh();
+  setInterval(refresh, 15000);
+</script>
+</body>
+</html>
     /* ---- existing styles ---- */
     :root {
       --bg: #0e0e10;
