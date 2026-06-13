@@ -130,3 +130,78 @@ async def api_deaths():
         return {"count": 0}
     count = await _bot.stats.get_deaths()
     return {"count": count}
+
+
+# ------------------------------------------------------------------ #
+#  Voice command endpoint — called by voice_listener.py              #
+# ------------------------------------------------------------------ #
+
+@app.post("/api/voice")
+async def api_voice(request: Request):
+    """
+    Accepts: {"command": "clip"} etc.
+    Executes the action as if the broadcaster typed it.
+    Returns {"ok": True, "result": "..."} or {"ok": False, "error": "..."}
+    """
+    if not _bot:
+        return JSONResponse({"ok": False, "error": "Bot not ready"}, status_code=503)
+
+    data = await request.json()
+    cmd = data.get("command", "").strip().lower()
+    arg = data.get("arg", "").strip()
+
+    channel = _bot.get_channel(_bot.cfg.channel)
+    if not channel:
+        return JSONResponse({"ok": False, "error": "Channel not connected"}, status_code=503)
+
+    if cmd == "clip":
+        if not _bot.stream_monitor.is_live:
+            return {"ok": False, "error": "Stream is offline"}
+        if _bot.clipper._on_cooldown():
+            return {"ok": False, "error": "Clip on cooldown"}
+        clip = await _bot.clipper.create_clip(
+            _bot.cfg.broadcaster_id, title="Voice clip", triggered_by="voice"
+        )
+        if clip:
+            from bot.clipping.clipper import Clipper
+            url = Clipper.public_url(clip)
+            _bot.highlight_mgr.record_clip(clip)
+            await channel.send(f"✂️ Voice clip saved! {url}")
+            return {"ok": True, "result": url}
+        return {"ok": False, "error": "Clip creation failed"}
+
+    elif cmd == "death":
+        count = await _bot.stats.increment_deaths()
+        await channel.send(f"💀 {_bot.cfg.channel} has died {count} time(s) this stream! F in chat")
+        return {"ok": True, "result": str(count)}
+
+    elif cmd == "shoutout":
+        if not arg:
+            return {"ok": False, "error": "No user specified"}
+        await channel.send(f"🎙️ Go check out @{arg} at https://twitch.tv/{arg} — show them some love! ❤️")
+        return {"ok": True, "result": f"Shouted out {arg}"}
+
+    elif cmd == "giveaway_start":
+        cog = _bot.fun_cog
+        if cog:
+            cog._giveaway_active = True
+            cog._giveaway_entries.clear()
+            await channel.send("🎉 Giveaway started! Type !enter to participate!")
+        return {"ok": True, "result": "Giveaway started"}
+
+    elif cmd == "giveaway_draw":
+        import random
+        cog = _bot.fun_cog
+        if cog and cog._giveaway_entries:
+            winner = random.choice(list(cog._giveaway_entries))
+            cog._giveaway_entries.discard(winner)
+            await channel.send(f"🏆 Congratulations @{winner}! You won the giveaway! 🎉")
+            return {"ok": True, "result": winner}
+        return {"ok": False, "error": "No entries"}
+
+    elif cmd == "hype":
+        await channel.send(f"🔥🔥🔥 LETS GOOO! PogChamp PogChamp PogChamp 🔥🔥🔥")
+        return {"ok": True, "result": "Hype sent"}
+
+    else:
+        return JSONResponse({"ok": False, "error": f"Unknown command: {cmd}"}, status_code=400)

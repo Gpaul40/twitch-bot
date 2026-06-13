@@ -11,12 +11,14 @@ import logging
 logger = logging.getLogger("bot.scheduled")
 
 DEFAULT_MESSAGES = [
-    "📋 Check out all bot commands: !commands | !clips | !sr | !8ball | !coinflip | !dice | !hug",
-    "✂️ See an epic moment? Type !clip in chat to save it!",
-    "💙 Enjoying the stream? Hit that Follow button so you never miss a stream! 🔔",
-    "🎉 Want to enter a giveaway when one is running? Watch for !giveaway start announcements!",
-    "📺 Check out our top clips with !topclips — some highlights in there! 🔥",
-    "🎵 Song requests are open! Use !sr <song name> to add your song to the queue.",
+    "🏀 Type !clip if you see an insane play — let's save the highlights!",
+    "💙 Enjoying the stream? Drop a follow so you never miss a game! 🔔",
+    "🎮 What team are you rolling with in NBA 2K? Let me know in chat!",
+    "✂️ See a crazy dunk or play? Type clip in chat and the bot will save it!",
+    "📊 Wanna see your chat stats? Type !mystats — who's the real MVP of chat?",
+    "🏆 Check out our best clips with !topclips — some highlight reels in there!",
+    "🎵 Song requests open! Use !sr <song name> to add to the queue.",
+    "🎯 !8ball — ask the bot anything, it knows all 👀",
 ]
 
 
