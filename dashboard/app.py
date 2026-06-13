@@ -203,5 +203,21 @@ async def api_voice(request: Request):
         await channel.send(f"🔥🔥🔥 LETS GOOO! PogChamp PogChamp PogChamp 🔥🔥🔥")
         return {"ok": True, "result": "Hype sent"}
 
+    elif cmd == "w":
+        await channel.send("🏆 W IN CHAT!! Let's gooo! PogChamp 🏆")
+        return {"ok": True, "result": "W sent"}
+
+    elif cmd == "rigged":
+        await channel.send("💀 RIGGED!! 2K does NOT want us to win chat 😭 the scripting is REAL")
+        return {"ok": True, "result": "Rigged sent"}
+
+    elif cmd == "clutch":
+        await channel.send("🧊 ICE IN THE VEINS!! What a play! clutchPog 🔥")
+        return {"ok": True, "result": "Clutch sent"}
+
+    elif cmd == "gg":
+        await channel.send("🤝 GG's chat! That was a fun one! Let's run it back!")
+        return {"ok": True, "result": "GG sent"}
+
     else:
         return JSONResponse({"ok": False, "error": f"Unknown command: {cmd}"}, status_code=400)
