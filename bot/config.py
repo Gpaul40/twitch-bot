@@ -56,6 +56,11 @@ class Config:
     # --- Stats ---
     stats_db: str = "data/stats.db"
 
+    # --- AI ---
+    openai_api_key: str = ""
+    ai_model: str = "gpt-4o-mini"
+    ai_cooldown: int = 10
+
     @classmethod
     def load(cls) -> "Config":
         raw_token = _require("TWITCH_OAUTH_TOKEN").replace("oauth:", "")
@@ -81,6 +86,9 @@ class Config:
             dashboard_host=_optional("DASHBOARD_HOST", "0.0.0.0"),
             dashboard_port=int(_optional("DASHBOARD_PORT", "8080")),
             stats_db=_optional("STATS_DB_PATH", "data/stats.db"),
+            openai_api_key=_optional("OPENAI_API_KEY"),
+            ai_model=_optional("AI_MODEL", "gpt-4o-mini"),
+            ai_cooldown=int(_optional("AI_COOLDOWN_SECONDS", "10")),
         )
 
 

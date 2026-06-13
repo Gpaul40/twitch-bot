@@ -18,6 +18,7 @@ from bot.scheduled import ScheduledMessages
 from bot.commands import general, clips, stats as stats_cmds
 from bot.commands.fun import FunCommands
 from bot.commands.mod_cmds import ModCommands
+from bot.commands.ai_cmd import AICommands
 from bot.queue import QueueCommands
 
 logging.basicConfig(
@@ -74,6 +75,7 @@ class TwitchBot(commands.Bot):
         self.add_cog(stats_cmds.StatsCommands(self))
         self.add_cog(FunCommands(self))
         self.add_cog(ModCommands(self))
+        self.add_cog(AICommands(self))
         self._queue_cog = QueueCommands(self)
         self.add_cog(self._queue_cog)
 
