@@ -11,6 +11,8 @@ from bot.clipping.clipper import Clipper
 from bot.clipping.highlight import HighlightManager
 from bot.stats.tracker import StatsTracker
 from bot.alerts.discord import DiscordAlerter
+from bot.alerts.twitter_poster import TwitterPoster
+from bot.alerts.auto_raid import AutoRaider
 from bot.rewards.handler import RewardHandler
 from bot.events.handler import EventHandler
 from bot.stream_monitor import StreamMonitor
@@ -54,8 +56,10 @@ class TwitchBot(commands.Bot):
         )
         self.stats = StatsTracker(db_path=cfg.stats_db)
         self.alerter = DiscordAlerter(webhook_url=cfg.discord_webhook)
+        self.twitter = TwitterPoster(cfg=cfg)
         self.clipper = Clipper(helix=self.helix, cfg=cfg, stats=self.stats)
         self.highlight_mgr = HighlightManager(helix=self.helix, alerter=self.alerter, stats=self.stats)
+        self.auto_raider = AutoRaider(helix=self.helix, cfg=cfg)
         self.stream_monitor = StreamMonitor(
             helix=self.helix,
             stats=self.stats,
@@ -63,6 +67,8 @@ class TwitchBot(commands.Bot):
             clipper=self.clipper,
             highlight_mgr=self.highlight_mgr,
             cfg=cfg,
+            twitter=self.twitter,
+            auto_raider=self.auto_raider,
         )
         self.event_handler = EventHandler(bot=self)
         self.reward_handler = RewardHandler(bot=self)
@@ -115,7 +121,10 @@ class TwitchBot(commands.Bot):
         )
         if clip:
             self.highlight_mgr.record_clip(clip)
-            await self.alerter.send_clip_alert(clip["edit_url"], triggered_by=message.author.name)
+            url = clip.get("url") or clip.get("edit_url", "")
+            await self.alerter.send_clip_alert(url, triggered_by=message.author.name)
+            if self.cfg.auto_tweet_clips:
+                await self.twitter.post_clip(url, clip.get("id", "Clip"), self.cfg.channel)
 
         # Check custom commands BEFORE built-in command routing
         content = message.content.strip()

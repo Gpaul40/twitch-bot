@@ -49,6 +49,18 @@ class Config:
     # --- Discord ---
     discord_webhook: str = ""
 
+    # --- Twitter/X ---
+    twitter_api_key: str = ""
+    twitter_api_secret: str = ""
+    twitter_access_token: str = ""
+    twitter_access_secret: str = ""
+    auto_tweet_live: bool = True
+    auto_tweet_clips: bool = True
+
+    # --- Auto-raid out ---
+    auto_raid_out: bool = True
+    raid_targets: list = field(default_factory=list)
+
     # --- Dashboard ---
     dashboard_host: str = "0.0.0.0"
     dashboard_port: int = 8080
@@ -83,6 +95,14 @@ class Config:
             auto_so_on_raid=_optional("AUTO_SO_ON_RAID", "true").lower() == "true",
             scheduled_msg_interval=int(_optional("SCHEDULED_MSG_INTERVAL", "1800")),
             discord_webhook=_optional("DISCORD_WEBHOOK_URL"),
+            twitter_api_key=_optional("TWITTER_API_KEY"),
+            twitter_api_secret=_optional("TWITTER_API_SECRET"),
+            twitter_access_token=_optional("TWITTER_ACCESS_TOKEN"),
+            twitter_access_secret=_optional("TWITTER_ACCESS_SECRET"),
+            auto_tweet_live=_optional("AUTO_TWEET_LIVE", "true").lower() == "true",
+            auto_tweet_clips=_optional("AUTO_TWEET_CLIPS", "true").lower() == "true",
+            auto_raid_out=_optional("AUTO_RAID_OUT", "true").lower() == "true",
+            raid_targets=[t.strip() for t in _optional("RAID_TARGETS", "").split(",") if t.strip()],
             dashboard_host=_optional("DASHBOARD_HOST", "0.0.0.0"),
             dashboard_port=int(_optional("DASHBOARD_PORT", "8080")),
             stats_db=_optional("STATS_DB_PATH", "data/stats.db"),

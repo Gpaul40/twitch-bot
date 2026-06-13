@@ -17,13 +17,15 @@ POLL_INTERVAL = 30  # seconds
 
 
 class StreamMonitor:
-    def __init__(self, helix, stats, alerter, clipper, highlight_mgr, cfg):
+    def __init__(self, helix, stats, alerter, clipper, highlight_mgr, cfg, twitter=None, auto_raider=None):
         self.helix = helix
         self.stats = stats
         self.alerter = alerter
         self.clipper = clipper
         self.highlight_mgr = highlight_mgr
         self.cfg = cfg
+        self.twitter = twitter
+        self.auto_raider = auto_raider
 
         self._live: bool = False
         self._stream_start: datetime | None = None
@@ -78,6 +80,8 @@ class StreamMonitor:
         logger.info(f"Stream LIVE — {title} | {game}")
         await self.stats.record_event("go_live", extra=f"{title} | {game}")
         await self.alerter.send_live_alert(self.cfg.channel, title, game)
+        if self.twitter:
+            await self.twitter.post_go_live(self.cfg.channel, title, game)
 
     async def _on_go_offline(self):
         self._live = False
@@ -91,11 +95,20 @@ class StreamMonitor:
         await self.stats.record_event("go_offline", extra=duration)
         await self.alerter.send_offline_alert(self.cfg.channel, duration)
         self._stream_start = None
-        self.current_stream = None
 
-        # Suggest highlights from this session's clips
+        # Twitter end-of-stream recap
+        clip_count = len(self.highlight_mgr._session_clips)
+        if self.twitter:
+            await self.twitter.post_go_offline(self.cfg.channel, duration, clip_count)
+
+        # Auto-raid out
+        game = self.current_stream.get("game_name", "") if self.current_stream else ""
+        self.current_stream = None
+        if self.auto_raider:
+            await self.auto_raider.raid_out(current_game_name=game)
+
+        # Suggest highlights
         await self._suggest_highlights()
-        # Post highlight candidates to Discord via highlight manager
         await self.highlight_mgr.process_end_of_stream(self.cfg.broadcaster_id)
 
     async def _check_hype_train(self):
