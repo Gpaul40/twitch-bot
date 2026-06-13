@@ -21,12 +21,14 @@ from bot.commands.mod_cmds import ModCommands
 from bot.commands.ai_cmd import AICommands
 from bot.queue import QueueCommands
 
+import sys
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("logs/bot.log"),
+        logging.StreamHandler(stream=open(sys.stdout.fileno(), mode='w', encoding='utf-8', closefd=False)),
+        logging.FileHandler("logs/bot.log", encoding="utf-8"),
     ],
 )
 logger = logging.getLogger("bot.core")

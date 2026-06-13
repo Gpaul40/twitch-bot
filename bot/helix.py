@@ -29,7 +29,8 @@ class HelixClient:
         self.client_secret = client_secret
         self.oauth_token = oauth_token
         self.refresh_token = refresh_token
-        self._token_expiry: float = 0.0
+        # Assume the provided token is valid for 4 hours; refresh will happen before expiry
+        self._token_expiry: float = time.time() + 14400
         self._lock = asyncio.Lock()
 
     # ------------------------------------------------------------------ #
@@ -47,6 +48,8 @@ class HelixClient:
     async def _refresh(self):
         if not self.refresh_token:
             logger.warning("No refresh token — cannot auto-refresh OAuth token.")
+            # Don't retry for 1 hour
+            self._token_expiry = time.time() + 3600
             return
         async with httpx.AsyncClient() as client:
             resp = await client.post(TOKEN_URL, data={
@@ -63,6 +66,8 @@ class HelixClient:
             logger.info("OAuth token refreshed successfully.")
         else:
             logger.error(f"Token refresh failed [{resp.status_code}]: {resp.text}")
+            # Back off — retry in 5 minutes instead of hammering the endpoint
+            self._token_expiry = time.time() + 300
 
     async def _headers(self) -> dict:
         await self._ensure_token()
@@ -175,9 +180,8 @@ class HelixClient:
     # ------------------------------------------------------------------ #
 
     async def get_hype_train(self, broadcaster_id: str) -> Optional[dict]:
-        data = await self._get("/hypetrain/events", params={"broadcaster_id": broadcaster_id})
-        if data and data.get("data"):
-            return data["data"][0]
+        # Hype train v1 endpoint is deprecated. EventSub is required for hype train events.
+        # Return None to disable polling — auto-clip on hype train won't trigger via polling.
         return None
 
     # ------------------------------------------------------------------ #
