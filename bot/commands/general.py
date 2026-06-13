@@ -19,7 +19,9 @@ class GeneralCommands(commands.Cog):
             "!mystats | !topchatters | "
             "!so <user> | !lurk | !game | !title | !uptime | "
             "!8ball | !dice | !coinflip | !rng | !hug | !slap | "
-            "!deaths"
+            "!deaths | !trivia | !predict | !poll | "
+            "!points | !toppoints | !rewards | !redeem | "
+            "!schedule"
         )
 
     @commands.command(name="lurk")

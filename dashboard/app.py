@@ -20,6 +20,9 @@ _bot = None
 # In-memory session state
 _wl = {"wins": 0, "losses": 0}
 _last_clip = {"count": 0, "triggered_by": "", "url": "", "ts": 0.0}
+_follow_goal = {"goal": 500, "current": 0}
+_sub_goal = {"goal": 10, "current": 0}
+_sub_count_session = 0
 
 
 def set_bot(bot):
@@ -62,6 +65,21 @@ async def overlay_wl(request: Request):
 @app.get("/overlay/alert", response_class=HTMLResponse)
 async def overlay_alert(request: Request):
     return templates.TemplateResponse("overlay_alert.html", {"request": request})
+
+
+@app.get("/overlay/follow_goal", response_class=HTMLResponse)
+async def overlay_follow_goal(request: Request):
+    return templates.TemplateResponse("overlay_follow_goal.html", {"request": request})
+
+
+@app.get("/overlay/sub_goal", response_class=HTMLResponse)
+async def overlay_sub_goal(request: Request):
+    return templates.TemplateResponse("overlay_sub_goal.html", {"request": request})
+
+
+@app.get("/overlay/nowplaying", response_class=HTMLResponse)
+async def overlay_nowplaying(request: Request):
+    return templates.TemplateResponse("overlay_nowplaying.html", {"request": request})
 
 
 # ------------------------------------------------------------------ #
@@ -167,6 +185,89 @@ async def api_wl():
 @app.get("/api/last_clip")
 async def api_last_clip():
     return _last_clip
+
+
+@app.get("/api/follow_goal")
+async def api_follow_goal():
+    # Try to get real follower count from Helix
+    if _bot:
+        try:
+            data = await _bot.helix._get("/channels/followers",
+                                         params={"broadcaster_id": _bot.cfg.broadcaster_id, "first": "1"})
+            if data:
+                _follow_goal["current"] = data.get("total", _follow_goal["current"])
+        except Exception:
+            pass
+    return _follow_goal
+
+
+@app.get("/api/sub_goal")
+async def api_sub_goal():
+    global _sub_count_session
+    return {"current": _sub_count_session, "goal": _sub_goal["goal"]}
+
+
+@app.get("/api/points")
+async def api_points(user: str = ""):
+    if not _bot or not hasattr(_bot, 'loyalty') or not user:
+        return {"balance": 0}
+    bal = await _bot.loyalty.get_points(user)
+    return {"username": user, "balance": bal}
+
+
+@app.get("/api/top_points")
+async def api_top_points():
+    if not _bot or not hasattr(_bot, 'loyalty'):
+        return []
+    top = await _bot.loyalty.get_top(10)
+    return [{"username": r[0], "balance": r[1]} for r in top]
+
+
+@app.post("/api/set_goal")
+async def api_set_goal(request: Request):
+    """Set follow or sub goal: {"type": "follow"/"sub", "goal": 500}"""
+    global _follow_goal, _sub_goal
+    data = await request.json()
+    gtype = data.get("type", "").lower()
+    goal = int(data.get("goal", 0))
+    if gtype == "follow":
+        _follow_goal["goal"] = goal
+        return {"ok": True}
+    elif gtype == "sub":
+        _sub_goal["goal"] = goal
+        return {"ok": True}
+    return JSONResponse({"ok": False, "error": "type must be follow or sub"}, status_code=400)
+
+
+@app.get("/api/stream_recap")
+async def api_stream_recap():
+    """Full stream recap — for end-of-stream Discord embed."""
+    if not _bot:
+        return {}
+    monitor = _bot.stream_monitor
+    duration = ""
+    if monitor._stream_start:
+        delta = datetime.now(timezone.utc) - monitor._stream_start
+        h, rem = divmod(int(delta.total_seconds()), 3600)
+        m = rem // 60
+        duration = f"{h}h {m}m"
+    try:
+        top = await _bot.stats.get_top_chatters(5)
+        top_chatters = [r[0] for r in top]
+    except Exception:
+        top_chatters = []
+    stream = monitor.current_stream or {}
+    return {
+        "title": stream.get("title", ""),
+        "game": stream.get("game_name", ""),
+        "duration": duration,
+        "peak_viewers": stream.get("viewer_count", 0),
+        "clips_this_session": len(_bot.highlight_mgr._session_clips),
+        "deaths": await _bot.stats.get_deaths(),
+        "wl": dict(_wl),
+        "top_chatters": top_chatters,
+        "sub_count": _sub_count_session,
+    }
 
 
 # ------------------------------------------------------------------ #

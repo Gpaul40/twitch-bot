@@ -21,6 +21,10 @@ from bot.commands import general, clips, stats as stats_cmds
 from bot.commands.fun import FunCommands
 from bot.commands.mod_cmds import ModCommands
 from bot.commands.ai_cmd import AICommands
+from bot.commands.games import ChatGames
+from bot.commands.points_cmds import PointsCommands
+from bot.commands.schedule import ScheduleCommands
+from bot.loyalty import LoyaltyPoints
 from bot.queue import QueueCommands
 
 import sys
@@ -73,6 +77,7 @@ class TwitchBot(commands.Bot):
         self.event_handler = EventHandler(bot=self)
         self.reward_handler = RewardHandler(bot=self)
         self.scheduled = ScheduledMessages(bot=self, interval_seconds=cfg.scheduled_msg_interval)
+        self.loyalty = LoyaltyPoints(db_path=cfg.stats_db, bot=self)
 
         # Track first-time chatters per session (reset on bot restart)
         self._seen_chatters: set[str] = set()
@@ -84,6 +89,10 @@ class TwitchBot(commands.Bot):
         self.add_cog(FunCommands(self))
         self.add_cog(ModCommands(self))
         self.add_cog(AICommands(self))
+        self.add_cog(PointsCommands(self))
+        self.add_cog(ScheduleCommands(self))
+        self._games_cog = ChatGames(self)
+        self.add_cog(self._games_cog)
         self._queue_cog = QueueCommands(self)
         self.add_cog(self._queue_cog)
 
@@ -94,6 +103,8 @@ class TwitchBot(commands.Bot):
     async def event_ready(self):
         logger.info(f"✅ Bot online as {self.nick} | Watching: #{self.cfg.channel}")
         await self.stats.init_db()
+        await self.loyalty.init_db()
+        self.loyalty.start()
         self.stream_monitor.start()
         self.scheduled.start()
 
@@ -103,6 +114,10 @@ class TwitchBot(commands.Bot):
 
     async def event_message(self, message):
         if message.echo:
+            return
+
+        # Never respond to the broadcaster's own messages
+        if message.author and message.author.name.lower() == self.cfg.channel.lower():
             return
 
         await self.stats.record_message(message)
@@ -137,6 +152,14 @@ class TwitchBot(commands.Bot):
 
         await self.handle_commands(message)
 
+        # Award loyalty point for chatting
+        await self.loyalty.add_points(message.author.name, 1, "chat")
+
+        # Games cog needs to see all messages for trivia answers & poll votes
+        if self._games_cog:
+            await self._games_cog.event_message(message)
+            await self._games_cog.check_poll_vote(message)
+
     # ------------------------------------------------------------------ #
     #  Raids                                                               #
     # ------------------------------------------------------------------ #
@@ -166,12 +189,25 @@ class TwitchBot(commands.Bot):
 
     async def event_usernotice_subscription(self, event):
         await self.event_handler.on_sub(event)
+        username = getattr(event.user, "name", "")
+        if username:
+            await self.loyalty.add_points(username, 100, "sub")
+            import dashboard.app as dash_app
+            dash_app._sub_count_session += 1
 
     async def event_usernotice_resubscription(self, event):
         await self.event_handler.on_resub(event)
+        username = getattr(event.user, "name", "")
+        if username:
+            await self.loyalty.add_points(username, 50, "resub")
+            import dashboard.app as dash_app
+            dash_app._sub_count_session += 1
 
     async def event_usernotice_giftsub(self, event):
         await self.event_handler.on_giftsub(event)
+        gifter = getattr(event.user, "name", "")
+        if gifter:
+            await self.loyalty.add_points(gifter, 50, "giftsub")
 
     async def event_usernotice_mysterygiftsub(self, event):
         gifter = getattr(event.user, "name", "Anonymous")
@@ -186,6 +222,11 @@ class TwitchBot(commands.Bot):
 
     async def event_cheer(self, event):
         await self.event_handler.on_cheer(event)
+        username = getattr(event.user, "name", "")
+        bits = getattr(event, "bits", 0)
+        if username and bits:
+            pts = max(1, bits // 10)
+            await self.loyalty.add_points(username, pts, f"cheer {bits} bits")
 
     async def event_follow(self, event):
         await self.event_handler.on_follow(event)

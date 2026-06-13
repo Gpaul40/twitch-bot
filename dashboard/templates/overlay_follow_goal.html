@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: transparent;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh;
+    }
+    .container {
+      background: rgba(0,0,0,0.78);
+      border: 2px solid rgba(145,70,255,0.5);
+      border-radius: 16px;
+      padding: 16px 24px;
+      min-width: 320px;
+      backdrop-filter: blur(8px);
+    }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .title { font-size: .85rem; font-weight: 700; color: rgba(255,255,255,.5); text-transform: uppercase; letter-spacing: .07em; }
+    .counts { font-size: .9rem; font-weight: 700; color: #9146ff; }
+    .bar-bg { background: rgba(255,255,255,.1); border-radius: 8px; height: 12px; overflow: hidden; }
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #9146ff, #c084fc);
+      border-radius: 8px;
+      transition: width 1s ease;
+      min-width: 4px;
+    }
+    .label { font-size: .78rem; color: rgba(255,255,255,.45); margin-top: 6px; text-align: center; }
+    .celebrate { display:none; font-size:1.4rem; text-align:center; margin-top:8px; animation: bounce .5s infinite alternate; }
+    .celebrate.show { display:block; }
+    @keyframes bounce { from{transform:scale(1)} to{transform:scale(1.15)} }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="title">🔔 Follow Goal</div>
+      <div class="counts"><span id="current">—</span> / <span id="goal">—</span></div>
+    </div>
+    <div class="bar-bg"><div class="bar-fill" id="bar" style="width:0%"></div></div>
+    <div class="label" id="label">Loading...</div>
+    <div class="celebrate" id="celebrate">🎉 GOAL HIT! THANK YOU! 🎉</div>
+  </div>
+  <script>
+    async function poll() {
+      try {
+        const r = await fetch('/api/follow_goal');
+        const d = await r.json();
+        document.getElementById('current').textContent = (d.current||0).toLocaleString();
+        document.getElementById('goal').textContent = (d.goal||0).toLocaleString();
+        const pct = Math.min(100, d.goal ? (d.current/d.goal*100) : 0);
+        document.getElementById('bar').style.width = pct.toFixed(1) + '%';
+        const remaining = Math.max(0, (d.goal||0) - (d.current||0));
+        document.getElementById('label').textContent = remaining > 0
+          ? `${remaining.toLocaleString()} more follows to go!`
+          : '🎉 Goal reached!';
+        document.getElementById('celebrate').className = 'celebrate' + (remaining <= 0 ? ' show' : '');
+      } catch {}
+      setTimeout(poll, 10000);
+    }
+    poll();
+  </script>
+</body>
+</html>

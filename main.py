@@ -11,14 +11,15 @@ import signal
 
 import uvicorn
 
+# Create dirs before any module imports that set up file logging
+os.makedirs("data", exist_ok=True)
+os.makedirs("logs", exist_ok=True)
+
 from bot.config import cfg  # validates env vars immediately
 from bot.core import TwitchBot
 from dashboard.app import app as dashboard_app, set_bot
 
 logger = logging.getLogger("main")
-
-os.makedirs("data", exist_ok=True)
-os.makedirs("logs", exist_ok=True)
 
 
 async def run_dashboard(bot: TwitchBot):

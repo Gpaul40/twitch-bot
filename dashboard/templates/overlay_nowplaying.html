@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: transparent;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh;
+    }
+    .container {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: rgba(0,0,0,0.78);
+      border: 2px solid rgba(0,180,255,0.4);
+      border-radius: 14px;
+      padding: 12px 20px;
+      min-width: 280px;
+      max-width: 420px;
+      backdrop-filter: blur(8px);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .4s, transform .4s;
+    }
+    .container.show { opacity: 1; transform: translateY(0); }
+    .icon { font-size: 1.8rem; flex-shrink: 0; }
+    .text { overflow: hidden; }
+    .now { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,.4); }
+    .song {
+      font-size: .95rem; font-weight: 700; color: #fff;
+      white-space: nowrap; overflow: hidden;
+      animation: scroll-text 8s linear infinite;
+    }
+    .user { font-size: .78rem; color: rgba(255,255,255,.45); margin-top: 1px; }
+    @keyframes scroll-text {
+      0%,20% { transform: translateX(0); }
+      80%,100% { transform: translateX(calc(-100% + 180px)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="box">
+    <div class="icon">🎵</div>
+    <div class="text">
+      <div class="now">Now Playing</div>
+      <div class="song" id="song">—</div>
+      <div class="user" id="user"></div>
+    </div>
+  </div>
+  <script>
+    let lastSong = '';
+    async function poll() {
+      try {
+        const r = await fetch('/api/queue');
+        const q = await r.json();
+        if (q && q.length > 0) {
+          const current = q[0];
+          const songText = current.request;
+          document.getElementById('song').textContent = songText;
+          document.getElementById('user').textContent = 'req by @' + current.user;
+          const box = document.getElementById('box');
+          if (songText !== lastSong) {
+            lastSong = songText;
+            box.classList.remove('show');
+            setTimeout(() => box.classList.add('show'), 100);
+          } else {
+            box.classList.add('show');
+          }
+        } else {
+          document.getElementById('box').classList.remove('show');
+        }
+      } catch {}
+      setTimeout(poll, 4000);
+    }
+    poll();
+  </script>
+</body>
+</html>
